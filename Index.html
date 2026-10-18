@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1257B8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Autofinder">
+<title>Autofinder</title>
+<style>
+/* Layout: eine schmale Spalte. Oben der große Speichern-Knopf, darunter die Liste der Parkplätze, neueste zuerst. */
+:root {
+  --bg: #EEF2F7;
+  --surface: #FFFFFF;
+  --fg: #0E1A2B;
+  --muted: #566780;
+  --line: #D3DCE8;
+  --accent: #1257B8;
+  --on-accent: #FFFFFF;
+  --walk: #1B7449;
+  --on-walk: #FFFFFF;
+  --bike: #A85400;
+  --on-bike: #FFFFFF;
+  --danger: #B3261E;
+  --focus: #E5A800;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B1320;
+    --surface: #142033;
+    --fg: #E8EEF7;
+    --muted: #9AAAC0;
+    --line: #28394F;
+    --accent: #5B9BFF;
+    --on-accent: #07101D;
+    --walk: #4CC38A;
+    --on-walk: #05150D;
+  --bike: #FFB45C;
+  --on-bike: #1C1000;
+    --danger: #FF9188;
+    --focus: #FFC933;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0B1320;
+  --surface: #142033;
+  --fg: #E8EEF7;
+  --muted: #9AAAC0;
+  --line: #28394F;
+  --accent: #5B9BFF;
+  --on-accent: #07101D;
+  --walk: #4CC38A;
+  --on-walk: #05150D;
+  --bike: #FFB45C;
+  --on-bike: #1C1000;
+  --danger: #FF9188;
+  --focus: #FFC933;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.4;
+  padding-inline: 16px;
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-bottom, 0px));
+}
+main { max-width: 560px; margin-inline: auto; display: flex; flex-direction: column; gap: 20px; }
+
+header { display: flex; align-items: center; gap: 12px; }
+.badge {
+  width: 40px; height: 40px; border-radius: 6px; flex: none;
+  background: var(--accent); color: var(--on-accent);
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 26px; line-height: 1;
+  border: 2px solid var(--on-accent);
+  outline: 2px solid var(--accent);
+}
+h1 { margin: 0; font-size: 1.5rem; letter-spacing: -0.01em; }
+h2 { margin: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; }
+
+.save {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+label { font-weight: 600; font-size: 0.95rem; }
+input[type="text"] {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  font: inherit; font-size: 16px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+input[type="text"]::placeholder { color: var(--muted); opacity: 0.8; }
+
+button, .btn {
+  font: inherit; font-weight: 700;
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button:disabled { opacity: 0.65; cursor: progress; }
+.primary { background: var(--accent); color: var(--on-accent); font-size: 1.15rem; min-height: 60px; }
+.go-car { background: var(--accent); color: var(--on-accent); }
+.go-walk { background: var(--walk); color: var(--on-walk); }
+.go-bike { background: var(--bike); color: var(--on-bike); }
+.ghost { background: transparent; color: var(--muted); font-weight: 600; min-height: 44px; padding: 0 12px; }
+.ghost.confirm { color: var(--danger); }
+button:focus-visible, .btn:focus-visible, input:focus-visible, .seg button:focus-visible {
+  outline: 3px solid var(--focus); outline-offset: 2px;
+}
+svg.i { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.status { min-height: 1.4em; margin: 0; font-size: 0.95rem; color: var(--muted); }
+.status.err { color: var(--danger); }
+.status.ok { color: var(--walk); }
+
+.list-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.seg button {
+  min-height: 40px; padding: 0 12px; font-size: 0.85rem; font-weight: 600;
+  background: transparent; color: var(--muted); border-radius: 0;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+
+ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  min-width: 0;
+}
+.name { margin: 0; font-size: 1.15rem; font-weight: 700; overflow-wrap: anywhere; }
+[hidden] { display: none !important; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.top > div:first-child { min-width: 0; }
+.dist { flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.dist strong { display: block; font-size: 1.3rem; line-height: 1.1; color: var(--accent); }
+.dist span { font-size: 0.75rem; color: var(--muted); }
+.dist-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-block: 10px 12px; }
+.dist-row .status { flex: 1 1 12rem; min-width: 0; min-height: 0; font-size: 0.85rem; }
+.small { min-height: 44px; font-size: 0.95rem; padding: 0 14px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); }
+.meta { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.actions .btn { flex-direction: column; gap: 4px; min-height: 64px; padding: 8px 4px; font-size: 0.9rem; }
+.card-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; margin-top: -4px; }
+select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  font: inherit; font-size: 16px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+select:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.folder-pick { display: flex; flex-direction: column; gap: 8px; }
+.groups { display: flex; flex-direction: column; gap: 14px; }
+.group > summary {
+  list-style: none;
+  display: flex; align-items: center; gap: 10px;
+  min-height: 48px; padding: 0 4px;
+  cursor: pointer;
+  font-weight: 700; font-size: 1.05rem;
+}
+.group > summary::-webkit-details-marker { display: none; }
+.group > summary::before {
+  content: ""; flex: none;
+  width: 8px; height: 8px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+}
+.group[open] > summary::before { transform: rotate(45deg); }
+.group > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
+.group > ul { margin-top: 2px; }
+.group-name { min-width: 0; overflow-wrap: anywhere; }
+.count { color: var(--muted); font-weight: 600; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.move { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.move .status { min-height: 0; }
+.move-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.empty {
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  padding: 20px 16px;
+  color: var(--muted);
+}
+.empty p { margin: 0; }
+.hint { color: var(--muted); font-size: 0.85rem; margin: 0; }
+
+.backup { display: flex; flex-direction: column; gap: 10px; }
+.backup-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.backup-row .small { flex: 1 1 10rem; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="badge" aria-hidden="true">P</div>
+    <h1>Autofinder</h1>
+  </header>
+
+  <section class="save" aria-label="Position speichern">
+    <label for="name">Name (optional)</label>
+    <input id="name" type="text" placeholder="z. B. Parkhaus Rheinufer, Ebene 2" maxlength="80" autocomplete="off" enterkeyhint="done">
+    <label for="folderSel">Ordner</label>
+    <div id="folderHost"></div>
+    <button id="saveBtn" class="primary" type="button">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.800 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></svg>
+      Position speichern
+    </button>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section aria-labelledby="listTitle">
+    <div class="list-head">
+      <h2 id="listTitle">Gespeicherte Positionen</h2>
+      <div class="seg" role="group" aria-label="Karten-App">
+        <button type="button" id="appGoogle" aria-pressed="true">Google Maps</button>
+        <button type="button" id="appApple" aria-pressed="false">Apple Karten</button>
+      </div>
+    </div>
+    <div id="distRow" class="dist-row" hidden>
+      <button id="distBtn" class="small" type="button">Entfernung aktualisieren</button>
+      <p id="distStatus" class="status" role="status" aria-live="polite"></p>
+    </div>
+    <div id="list" class="groups"></div>
+  </section>
+
+  <section class="backup" aria-labelledby="backupTitle">
+    <h2 id="backupTitle">Sicherung</h2>
+    <p class="hint">Speichert alle Positionen als Datei, zum Beispiel für ein neues Handy oder falls der Browser seine Daten löscht.</p>
+    <div class="backup-row">
+      <button id="exportBtn" class="small" type="button">Sicherung speichern</button>
+      <button id="importBtn" class="small" type="button">Sicherung laden</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden>
+    </div>
+    <p id="backupStatus" class="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <p class="hint">Tipp: Im Browsermenü „Zum Home-Bildschirm“ wählen, dann startet die App wie jede andere.</p>
+</main>
+
+<script>
+(function () {
+  var KEY = 'autofinder.v1';
+  var PREF = 'autofinder.karten';
+  var memList = null;
+  var memPref = null;
+  var here = null; /* dein aktueller Standort, nur im Arbeitsspeicher */
+
+  var nameEl = document.getElementById('name');
+  var saveBtn = document.getElementById('saveBtn');
+  var statusEl = document.getElementById('status');
+  var listEl = document.getElementById('list');
+  var btnGoogle = document.getElementById('appGoogle');
+  var btnApple = document.getElementById('appApple');
+  var distRow = document.getElementById('distRow');
+  var distBtn = document.getElementById('distBtn');
+  var distStatus = document.getElementById('distStatus');
+
+  function setStatus(text, kind) {
+    statusEl.textContent = text || '';
+    statusEl.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  /* Speicher im Browser (localStorage), mit Rückfall auf den Arbeitsspeicher */
+  function loadList() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      var data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data : [];
+    } catch (e) { return memList || []; }
+  }
+  function storeList(list) {
+    memList = list;
+    try { localStorage.setItem(KEY, JSON.stringify(list)); return true; }
+    catch (e) { return false; }
+  }
+  function getApp() {
+    var p = null;
+    try { p = localStorage.getItem(PREF); } catch (e) { p = memPref; }
+    if (p === 'apple' || p === 'google') return p;
+    return /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'apple' : 'google';
+  }
+  function setApp(v) {
+    memPref = v;
+    try { localStorage.setItem(PREF, v); } catch (e) {}
+    render();
+  }
+
+  /* GPS: sammelt ein paar Sekunden lang Messungen und nimmt die genaueste */
+  function locate(onUpdate) {
+    return new Promise(function (resolve, reject) {
+      if (!navigator.geolocation) { reject({ code: -1 }); return; }
+      var best = null, done = false, watchId = null, timer = null;
+      function finish() {
+        if (done) return;
+        done = true;
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        clearTimeout(timer);
+        if (best) resolve(best); else reject({ code: 3 });
+      }
+      watchId = navigator.geolocation.watchPosition(function (p) {
+        if (!best || p.coords.accuracy < best.coords.accuracy) best = p;
+        onUpdate(best);
+        if (best.coords.accuracy <= 20) finish();
+      }, function (err) {
+        if (done) return;
+        if (best) { finish(); return; }
+        done = true;
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        clearTimeout(timer);
+        reject(err);
+      }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+      timer = setTimeout(finish, 12000);
+    });
+  }
+
+  function errorText(e) {
+    if (!window.isSecureContext) return 'Der Standort funktioniert nur, wenn die Seite über https geöffnet wird. Eine lokal geöffnete Datei reicht nicht.';
+    if (e && e.code === 1) return 'Standortzugriff ist blockiert. Erlaube ihn in den Browser-Einstellungen für diese Seite und versuche es erneut.';
+    if (e && e.code === 2) return 'Deine Position ist gerade nicht verfügbar. Geh nach draußen und versuche es erneut.';
+    if (e && e.code === 3) return 'Die Standortsuche hat zu lange gedauert. Bitte versuche es erneut.';
+    return 'Dieses Gerät oder dieser Browser kann den Standort nicht bestimmen.';
+  }
+
+  /* Entfernung (Luftlinie) zwischen zwei Punkten in Metern */
+  function distance(a, b) {
+    var R = 6371000, rad = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * rad;
+    var dLng = (b.lng - a.lng) * rad;
+    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  function formatDist(m) {
+    if (m < 100) return Math.round(m) + ' m';
+    if (m < 995) return (Math.round(m / 10) * 10) + ' m';
+    var km = m / 1000;
+    return (km < 10 ? km.toFixed(1) : String(Math.round(km))).replace('.', ',') + ' km';
+  }
+  function setDist(text, kind) {
+    distStatus.textContent = text || '';
+    distStatus.className = 'status' + (kind ? ' ' + kind : '');
+  }
+  function refreshHere() {
+    if (!navigator.geolocation) { setDist(errorText({ code: -1 }), 'err'); return; }
+    distBtn.disabled = true;
+    setDist('Bestimme deinen Standort …');
+    navigator.geolocation.getCurrentPosition(function (p) {
+      here = { lat: p.coords.latitude, lng: p.coords.longitude };
+      distBtn.disabled = false;
+      var time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      setDist('Standort von ' + time + ' Uhr (± ' + Math.round(p.coords.accuracy) + ' m)', 'ok');
+      softRender();
+    }, function (e) {
+      distBtn.disabled = false;
+      setDist(errorText(e), 'err');
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+  }
+  /* Aktualisiert automatisch, wenn der Standortzugriff schon erlaubt ist */
+  function autoRefresh() {
+    if (document.hidden || !loadList().length) return;
+    if (!navigator.permissions || !navigator.permissions.query) return;
+    navigator.permissions.query({ name: 'geolocation' }).then(function (r) {
+      if (r.state === 'granted') refreshHere();
+    }).catch(function () {});
+  }
+
+  function formatDate(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    try {
+      return d.toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+    } catch (e) { return d.toLocaleString(); }
+  }
+
+  function navUrl(item, mode) {
+    var ll = item.lat + ',' + item.lng;
+    if (getApp() === 'apple') {
+      var flag = { walk: 'w', bike: 'b', car: 'd' }[mode];
+      return 'https://maps.apple.com/?daddr=' + ll + '&dirflg=' + flag;
+    }
+    var travel = { walk: 'walking', bike: 'bicycling', car: 'driving' }[mode];
+    return 'https://www.google.com/maps/dir/?api=1&destination=' + ll + '&travelmode=' + travel + '&dir_action=navigate';
+  }
+
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  function icon(paths) {
+    var s = document.createElementNS(SVG_NS, 'svg');
+    s.setAttribute('class', 'i');
+    s.setAttribute('viewBox', '0 0 24 24');
+    s.setAttribute('aria-hidden', 'true');
+    paths.forEach(function (p) {
+      var el = document.createElementNS(SVG_NS, p.t);
+      for (var k in p.a) el.setAttribute(k, p.a[k]);
+      s.appendChild(el);
+    });
+    return s;
+  }
+  function carIcon() {
+    return icon([
+      { t: 'path', a: { d: 'M4 16h16v-4l-2-5H6l-2 5v4z' } },
+      { t: 'path', a: { d: 'M5.500 16v2.500M18.500 16v2.500' } },
+      { t: 'circle', a: { cx: '8', cy: '13', r: '1' } },
+      { t: 'circle', a: { cx: '16', cy: '13', r: '1' } }
+    ]);
+  }
+  function walkIcon() {
+    return icon([
+      { t: 'circle', a: { cx: '13', cy: '4.500', r: '1.700' } },
+      { t: 'path', a: { d: 'M10.500 21l2-6-2-3 1-4 3 2 2 3M12.500 15l2.500 2v4M9 12l2.500-3' } }
+    ]);
+  }
+
+  function bikeIcon() {
+    return icon([
+      { t: 'circle', a: { cx: '6', cy: '16', r: '3.500' } },
+      { t: 'circle', a: { cx: '18', cy: '16', r: '3.500' } },
+      { t: 'path', a: { d: 'M6 16l3.500-7h5.500l3 7M9.500 9l3 7 2.500-7M13.500 6h2' } }
+    ]);
+  }
+
+  function link(item, mode) {
+    var a = document.createElement('a');
+    a.className = 'btn go-' + mode;
+    a.href = navUrl(item, mode);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.appendChild(mode === 'walk' ? walkIcon() : mode === 'bike' ? bikeIcon() : carIcon());
+    a.appendChild(document.createTextNode(mode === 'walk' ? 'Zu Fuß' : mode === 'bike' ? 'Fahrrad' : 'Auto'));
+    return a;
+  }
+
+  /* ---------- Ordner ---------- */
+  var NEW_FOLDER = '\u0001new';
+  var FKEY = 'autofinder.folder';
+  var CKEY = 'autofinder.closed';
+  var memFolder = '';
+  var memClosed = {};
+  var savePicker = null;
+  var savePickerKey = null;
+  var movePanel = null;
+
+  function normFolder(s) {
+    return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 40);
+  }
+  function folderNames(list) {
+    var seen = {}, out = [];
+    list.forEach(function (it) {
+      var f = normFolder(it.folder);
+      if (f && !seen[f.toLowerCase()]) { seen[f.toLowerCase()] = true; out.push(f); }
+    });
+    return out.sort(function (a, b) { return a.localeCompare(b, 'de', { sensitivity: 'base' }); });
+  }
+  /* Gibt den Namen eines vorhandenen Ordners zurück, wenn er sich nur durch Groß-/Kleinschreibung unterscheidet */
+  function matchFolder(name, names) {
+    var n = normFolder(name);
+    for (var i = 0; i < names.length; i++) {
+      if (names[i].toLowerCase() === n.toLowerCase()) return names[i];
+    }
+    return n;
+  }
+  function getLastFolder() {
+    try { return localStorage.getItem(FKEY) || ''; } catch (e) { return memFolder; }
+  }
+  function setLastFolder(f) {
+    memFolder = f;
+    try { localStorage.setItem(FKEY, f); } catch (e) {}
+  }
+  function getClosed() {
+    try {
+      var o = JSON.parse(localStorage.getItem(CKEY) || '{}');
+      return o && typeof o === 'object' ? o : {};
+    } catch (e) { return memClosed; }
+  }
+  function setClosed(key, closed) {
+    var o = getClosed();
+    if (closed) o[key] = 1; else delete o[key];
+    memClosed = o;
+    try { localStorage.setItem(CKEY, JSON.stringify(o)); } catch (e) {}
+  }
+
+  /* Auswahlfeld für den Ordner: vorhandene Ordner, „Ohne Ordner“ und „Neuer Ordner“ */
+  function makePicker(current, withIds) {
+    var names = folderNames(loadList());
+    var wrap = document.createElement('div');
+    wrap.className = 'folder-pick';
+    var sel = document.createElement('select');
+    sel.setAttribute('aria-label', 'Ordner');
+    sel.add(new Option('Ohne Ordner', ''));
+    names.forEach(function (n) { sel.add(new Option(n, n)); });
+    sel.add(new Option('+ Neuer Ordner …', NEW_FOLDER));
+    var cur = matchFolder(current, names);
+    sel.value = names.indexOf(cur) >= 0 ? cur : '';
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    inp.maxLength = 40;
+    inp.placeholder = 'Name des neuen Ordners';
+    inp.setAttribute('aria-label', 'Name des neuen Ordners');
+    inp.autocomplete = 'off';
+    inp.hidden = true;
+    if (withIds) { sel.id = 'folderSel'; inp.id = 'folderNew'; }
+    sel.addEventListener('change', function () {
+      inp.hidden = sel.value !== NEW_FOLDER;
+      if (!inp.hidden) inp.focus();
+    });
+    wrap.appendChild(sel);
+    wrap.appendChild(inp);
+    return {
+      el: wrap,
+      focus: function () { sel.focus(); },
+      isIncomplete: function () { return sel.value === NEW_FOLDER && !normFolder(inp.value); },
+      getValue: function () {
+        if (sel.value === NEW_FOLDER) return matchFolder(inp.value, folderNames(loadList()));
+        return sel.value;
+      }
+    };
+  }
+
+  /* Baut das Auswahlfeld beim Speichern nur neu, wenn sich die Ordner geändert haben */
+  function syncSavePicker() {
+    var host = document.getElementById('folderHost');
+    var key = folderNames(loadList()).join('\u0001');
+    if (savePicker && key === savePickerKey) return;
+    var current = savePicker ? savePicker.getValue() : getLastFolder();
+    savePicker = makePicker(current, true);
+    savePickerKey = key;
+    host.textContent = '';
+    host.appendChild(savePicker.el);
+  }
+
+  function removeItem(id) {
+    var list = loadList().filter(function (it) { return it.id !== id; });
+    storeList(list);
+    render();
+  }
+  function moveItem(id, folder) {
+    var list = loadList().map(function (it) {
+      if (it.id === id) it.folder = folder;
+      return it;
+    });
+    storeList(list);
+    render();
+  }
+  function closeMovePanel() {
+    if (movePanel && movePanel.el.parentNode) movePanel.el.parentNode.removeChild(movePanel.el);
+    movePanel = null;
+  }
+  /* Zeichnet nicht neu, solange das Fenster „Ordner ändern“ offen ist */
+  function softRender() {
+    if (movePanel) return;
+    render();
+  }
+
+  function buildCard(item) {
+    var li = document.createElement('li');
+    li.className = 'card';
+
+    var head = document.createElement('div');
+    var h = document.createElement('p');
+    h.className = 'name';
+    h.textContent = item.name || 'Parkplatz';
+    var d = document.createElement('p');
+    d.className = 'meta';
+    d.textContent = formatDate(item.t);
+    var c = document.createElement('p');
+    c.className = 'meta';
+    c.textContent = Number(item.lat).toFixed(5) + ', ' + Number(item.lng).toFixed(5) + (item.acc ? '  (± ' + item.acc + ' m)' : '');
+    head.appendChild(h); head.appendChild(d); head.appendChild(c);
+
+    var top = document.createElement('div');
+    top.className = 'top';
+    top.appendChild(head);
+    if (here) {
+      var dd = document.createElement('div');
+      dd.className = 'dist';
+      var s1 = document.createElement('strong');
+      s1.textContent = formatDist(distance(here, item));
+      var s2 = document.createElement('span');
+      s2.textContent = 'Luftlinie';
+      dd.appendChild(s1); dd.appendChild(s2);
+      top.appendChild(dd);
+    }
+
+    var actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.appendChild(link(item, 'walk'));
+    actions.appendChild(link(item, 'bike'));
+    actions.appendChild(link(item, 'car'));
+
+    var foot = document.createElement('div');
+    foot.className = 'card-foot';
+
+    var moveBtn = document.createElement('button');
+    moveBtn.type = 'button';
+    moveBtn.className = 'ghost';
+    moveBtn.textContent = 'Ordner ändern';
+    moveBtn.addEventListener('click', function () {
+      if (movePanel && movePanel.id === item.id) { closeMovePanel(); return; }
+      closeMovePanel();
+      var panel = document.createElement('div');
+      panel.className = 'move';
+      var lab = document.createElement('p');
+      lab.className = 'meta';
+      lab.textContent = 'In diesen Ordner verschieben:';
+      var picker = makePicker(normFolder(item.folder));
+      var msg = document.createElement('p');
+      msg.className = 'status';
+      msg.setAttribute('role', 'status');
+      var row = document.createElement('div');
+      row.className = 'move-row';
+      var ok = document.createElement('button');
+      ok.type = 'button';
+      ok.className = 'small';
+      ok.textContent = 'Verschieben';
+      ok.addEventListener('click', function () {
+        if (picker.isIncomplete()) {
+          msg.textContent = 'Bitte gib einen Namen für den neuen Ordner ein.';
+          msg.className = 'status err';
+          return;
+        }
+        moveItem(item.id, picker.getValue());
+      });
+      var cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'ghost';
+      cancel.textContent = 'Abbrechen';
+      cancel.addEventListener('click', closeMovePanel);
+      row.appendChild(ok); row.appendChild(cancel);
+      panel.appendChild(lab); panel.appendChild(picker.el); panel.appendChild(row); panel.appendChild(msg);
+      li.appendChild(panel);
+      movePanel = { el: panel, id: item.id };
+      picker.focus();
+    });
+
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'ghost';
+    del.textContent = 'Löschen';
+    var timer = null;
+    del.addEventListener('click', function () {
+      if (del.classList.contains('confirm')) {
+        clearTimeout(timer);
+        removeItem(item.id);
+        return;
+      }
+      del.classList.add('confirm');
+      del.textContent = 'Wirklich löschen?';
+      timer = setTimeout(function () {
+        del.classList.remove('confirm');
+        del.textContent = 'Löschen';
+      }, 4000);
+    });
+    foot.appendChild(moveBtn);
+    foot.appendChild(del);
+
+    li.appendChild(top); li.appendChild(actions); li.appendChild(foot);
+    return li;
+  }
+
+  function makeUl(items) {
+    var ul = document.createElement('ul');
+    items.forEach(function (it) { ul.appendChild(buildCard(it)); });
+    return ul;
+  }
+
+  function makeGroup(name, items) {
+    var key = name ? 'f:' + name.toLowerCase() : 'none';
+    var det = document.createElement('details');
+    det.className = 'group';
+    det.open = !getClosed()[key];
+    var sum = document.createElement('summary');
+    var label = document.createElement('span');
+    label.className = 'group-name';
+    label.textContent = name || 'Ohne Ordner';
+    var count = document.createElement('span');
+    count.className = 'count';
+    count.textContent = String(items.length);
+    sum.appendChild(label); sum.appendChild(count);
+    det.appendChild(sum);
+    det.appendChild(makeUl(items));
+    det.addEventListener('toggle', function () { setClosed(key, !det.open); });
+    return det;
+  }
+
+  function render() {
+    var app = getApp();
+    btnGoogle.setAttribute('aria-pressed', String(app === 'google'));
+    btnApple.setAttribute('aria-pressed', String(app === 'apple'));
+
+    movePanel = null;
+    var list = loadList();
+    distRow.hidden = !list.length;
+    syncSavePicker();
+    listEl.textContent = '';
+
+    if (!list.length) {
+      var ul = document.createElement('ul');
+      var li = document.createElement('li');
+      li.className = 'empty';
+      var p = document.createElement('p');
+      p.textContent = 'Noch keine Position gespeichert. Gib oben optional einen Namen ein, wähle bei Bedarf einen Ordner und tippe auf „Position speichern“, sobald du dein Auto abgestellt hast.';
+      li.appendChild(p);
+      ul.appendChild(li);
+      listEl.appendChild(ul);
+      return;
+    }
+
+    var names = folderNames(list);
+    if (!names.length) { listEl.appendChild(makeUl(list)); return; }
+
+    var groups = {};
+    names.forEach(function (n) { groups[n.toLowerCase()] = []; });
+    var none = [];
+    list.forEach(function (it) {
+      var f = normFolder(it.folder);
+      if (f) groups[f.toLowerCase()].push(it); else none.push(it);
+    });
+    names.forEach(function (n) { listEl.appendChild(makeGroup(n, groups[n.toLowerCase()])); });
+    if (none.length) listEl.appendChild(makeGroup('', none));
+  }
+
+  saveBtn.addEventListener('click', function () {
+    if (savePicker && savePicker.isIncomplete()) {
+      setStatus('Bitte gib einen Namen für den neuen Ordner ein.', 'err');
+      return;
+    }
+    var folder = savePicker ? savePicker.getValue() : '';
+    saveBtn.disabled = true;
+    setStatus('Suche GPS-Signal …');
+    locate(function (p) {
+      setStatus('Suche GPS-Signal … Genauigkeit ± ' + Math.round(p.coords.accuracy) + ' m');
+    }).then(function (p) {
+      var now = new Date();
+      var item = {
+        id: String(now.getTime()),
+        name: nameEl.value.trim() || 'Parkplatz',
+        folder: folder,
+        lat: Number(p.coords.latitude.toFixed(6)),
+        lng: Number(p.coords.longitude.toFixed(6)),
+        acc: Math.round(p.coords.accuracy),
+        t: now.toISOString()
+      };
+      var list = loadList();
+      list.unshift(item);
+      var ok = storeList(list);
+      nameEl.value = '';
+      setLastFolder(folder);
+      here = { lat: item.lat, lng: item.lng };
+      setDist('Standort beim Speichern übernommen', 'ok');
+      render();
+      var where = folder ? ' in „' + folder + '“' : '';
+      if (ok) setStatus('Gespeichert: ' + item.name + where + ' (± ' + item.acc + ' m)', 'ok');
+      else setStatus('Gespeichert, aber der Browser behält die Liste nicht dauerhaft (privater Modus?).', 'err');
+    }).catch(function (e) {
+      setStatus(errorText(e), 'err');
+    }).then(function () {
+      saveBtn.disabled = false;
+    });
+  });
+
+  nameEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); }
+  });
+  btnGoogle.addEventListener('click', function () { setApp('google'); });
+  btnApple.addEventListener('click', function () { setApp('apple'); });
+  /* Sicherung: Export und Import als JSON-Datei */
+  var exportBtn = document.getElementById('exportBtn');
+  var importBtn = document.getElementById('importBtn');
+  var importFile = document.getElementById('importFile');
+  var backupStatus = document.getElementById('backupStatus');
+
+  function setBackup(text, kind) {
+    backupStatus.textContent = text || '';
+    backupStatus.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  function cleanItem(x) {
+    if (!x || typeof x !== 'object') return null;
+    var lat = Number(x.lat), lng = Number(x.lng);
+    if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+    var t = new Date(x.t);
+    if (isNaN(t.getTime())) return null;
+    var acc = Number(x.acc);
+    return {
+      id: String(x.id || t.getTime()),
+      name: String(x.name || 'Parkplatz').slice(0, 80),
+      lat: lat,
+      lng: lng,
+      acc: isFinite(acc) && acc > 0 ? Math.round(acc) : 0,
+      folder: normFolder(x.folder),
+      t: t.toISOString()
+    };
+  }
+
+  /* Liest eine Sicherungsdatei und führt sie mit der vorhandenen Liste zusammen */
+  function mergeBackup(text, existing) {
+    var data = JSON.parse(text);
+    var raw = Array.isArray(data) ? data : (data && Array.isArray(data.positionen) ? data.positionen : null);
+    if (!raw) throw new Error('format');
+    var known = {};
+    existing.forEach(function (it) { known[it.id] = true; });
+    var canon = {};
+    folderNames(existing).forEach(function (n) { canon[n.toLowerCase()] = n; });
+    var added = [];
+    raw.forEach(function (x) {
+      var c = cleanItem(x);
+      if (c && !known[c.id]) {
+        if (c.folder) {
+          var lk = c.folder.toLowerCase();
+          if (canon[lk]) c.folder = canon[lk]; else canon[lk] = c.folder;
+        }
+        known[c.id] = true;
+        added.push(c);
+      }
+    });
+    var merged = existing.concat(added).sort(function (a, b) { return a.t < b.t ? 1 : a.t > b.t ? -1 : 0; });
+    return { list: merged, added: added.length, skipped: raw.length - added.length };
+  }
+
+  exportBtn.addEventListener('click', function () {
+    var list = loadList();
+    if (!list.length) { setBackup('Es gibt noch keine Positionen zum Sichern.', 'err'); return; }
+    var text = JSON.stringify({ app: 'autofinder', version: 2, exportiert: new Date().toISOString(), positionen: list }, null, 2);
+    var day = new Date().toISOString().slice(0, 10);
+    var fileName = 'autofinder-sicherung-' + day + '.json';
+    try {
+      var blob = new Blob([text], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      setBackup(list.length + ' Positionen gesichert als ' + fileName + '. Du findest die Datei im Ordner „Downloads“ bzw. in der App „Dateien“.', 'ok');
+    } catch (e) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          setBackup('Die Datei ließ sich nicht speichern. Der Inhalt wurde stattdessen in die Zwischenablage kopiert. Füge ihn in eine Notiz ein.', 'ok');
+        }).catch(function () {
+          setBackup('Das Speichern ist auf diesem Gerät nicht möglich.', 'err');
+        });
+      } else {
+        setBackup('Das Speichern ist auf diesem Gerät nicht möglich.', 'err');
+      }
+    }
+  });
+
+  importBtn.addEventListener('click', function () { importFile.click(); });
+  importFile.addEventListener('change', function () {
+    var f = importFile.files && importFile.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var res = mergeBackup(String(reader.result), loadList());
+        if (res.added) {
+          storeList(res.list);
+          render();
+        }
+        setBackup(res.added + ' Positionen hinzugefügt' + (res.skipped ? ', ' + res.skipped + ' übersprungen (schon vorhanden oder ungültig).' : '.'), res.added ? 'ok' : '');
+      } catch (e) {
+        setBackup('Diese Datei ist keine gültige Autofinder-Sicherung.', 'err');
+      }
+      importFile.value = '';
+    };
+    reader.onerror = function () { setBackup('Die Datei konnte nicht gelesen werden.', 'err'); };
+    reader.readAsText(f);
+  });
+
+  distBtn.addEventListener('click', refreshHere);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) autoRefresh();
+  });
+
+  render();
+  if (loadList().length) setDist('Tippe auf „Entfernung aktualisieren“, um die Luftlinie zu deinem Standort zu sehen.');
+  autoRefresh();
+})();
+</script>
+</body>
+</html>
